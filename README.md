@@ -21,7 +21,7 @@
 | 🔄 热重载 | `/reload_plugins` 免重启同步代码；`/add_plugin` 免重启安装新插件 |
 | 🛡️ 权限管控 | 超级管理员（ADMIN_ID）+ 普通管理员列表（ADMIN_LIST） |
 | 📋 命令菜单自动同步 | 启动/热重载时自动同步命令菜单到 Telegram，与 help.txt 永远一致 |
-| 🐳 容器化部署 | Docker / Docker-Compose 一键部署，数据持久化 |
+| 🐳 容器化部署 | Docker 镜像部署（公共镜像 / 本地构建），数据持久化，镜像不含任何密钥/数据 |
 
 ---
 
@@ -78,17 +78,17 @@ pip install -r requirements.txt
 cp .env.example .env   # Windows: copy .env.example .env
 ```
 
-编辑 `.env`：
+编辑 `.env`（配置项一览）：
 
-```
-BOT_TOKEN=你的BotToken
-API_ID=你的API_ID
-API_HASH=你的API_HASH
-ADMIN_ID=你的TG用户ID
-ADMIN_LIST=可选,逗号分隔多个管理员ID
-PROXY=http://127.0.0.1:7897   # 中国大陆必须填代理
-LOG_LEVEL=INFO
-```
+| 变量 | 必填 | 说明 |
+|---|---|---|
+| `BOT_TOKEN` | ✅ | Telegram Bot Token（@BotFather 获取，格式 `数字:密钥`） |
+| `API_ID` | ✅ | Telegram API ID（my.telegram.org） |
+| `API_HASH` | ✅ | Telegram API Hash（32 位） |
+| `ADMIN_ID` | ✅* | 超级管理员用户 ID（与 ADMIN_LIST 至少其一） |
+| `ADMIN_LIST` | ✅* | 普通管理员列表，逗号分隔多个 ID |
+| `PROXY` | ❌ | 代理地址，如 `http://127.0.0.1:7897`（中国大陆必须填） |
+| `LOG_LEVEL` | ❌ | 日志级别，默认 `INFO` |
 
 ### 3. 启动
 
@@ -101,6 +101,32 @@ python features/look/look_server.py
 ```
 
 启动成功后访问：**http://127.0.0.1:7777**
+
+### 4. Docker 一键部署（推荐生产环境）
+
+```bash
+# ① 拉取公共镜像
+docker pull kejizhihui/openbot:1.1
+
+# ② 准备挂载目录（首次部署：目录 + 空 .env 即可，程序会自动写入模板并提示填写）
+#    Windows:
+mkdir C:\openbot\download C:\openbot\logs C:\openbot\sessions
+type nul > C:\openbot\.env
+#    Linux:
+mkdir -p /opt/openbot/{download,logs,sessions} && touch /opt/openbot/.env
+
+# ③ 运行容器
+docker run -d --name openbot --restart unless-stopped \
+  --add-host=host.docker.internal:host-gateway -p 7777:7777 \
+  -v C:\openbot\.env:/app/.env -v C:\openbot\download:/app/download \
+  -v C:\openbot\logs:/app/logs -v C:\openbot\sessions:/app/sessions \
+  kejizhihui/openbot:1.1
+
+# ④ 看日志提示 → 编辑 .env 填入真实配置 → docker restart openbot
+# ⑤ 给 Bot 发 /mtlogin 完成登录 → 开始使用
+```
+
+> 首次部署说明：`.env` 为空时程序会自动写入模板并提示缺少的配置项，配置错误会自动重置为模板（旧配置备份 `.env.bak`），数据库首次启动自动创建，无需手动初始化。
 
 ---
 
@@ -236,25 +262,37 @@ def register(manager):
 
 ## 🐳 Docker 部署
 
-### 1. 配置 .env（同上）
-
-### 2. 构建镜像并启动
+### 方式一：公共镜像（推荐，免构建）
 
 ```bash
-# 构建镜像（项目根目录）
-docker build -t openbot-deploy:latest .
-
-# 运行容器（Windows/PowerShell 写法，Linux 改路径）
-docker run -d --name openbot-deploy --restart unless-stopped \
+docker pull kejizhihui/openbot:1.1
+docker run -d --name openbot --restart unless-stopped \
   --add-host=host.docker.internal:host-gateway -p 7777:7777 \
-  --log-opt max-size=20m --log-opt max-file=3 \
-  -v "C:\openbot\.env:/app/.env" \
-  -v "C:\openbot\download:/app/download" -v "C:\openbot\logs:/app/logs" \
-  -v "C:\openbot\sessions:/app/sessions" -v "C:\openbot\data:/app/data" \
+  -v C:\openbot\.env:/app/.env -v C:\openbot\download:/app/download \
+  -v C:\openbot\logs:/app/logs -v C:\openbot\sessions:/app/sessions \
+  kejizhihui/openbot:1.1
+```
+
+### 方式二：本地构建（改代码后自用）
+
+```bash
+docker build -t openbot-deploy:latest .
+docker run -d --name openbot --restart unless-stopped \
+  --add-host=host.docker.internal:host-gateway -p 7777:7777 \
+  -v C:\openbot\.env:/app/.env -v C:\openbot\download:/app/download \
+  -v C:\openbot\logs:/app/logs -v C:\openbot\sessions:/app/sessions \
   openbot-deploy:latest
 ```
 
-### 3. 访问
+### 升级
+
+```bash
+docker stop openbot && docker rm openbot   # 数据都在挂载目录，删除容器不丢数据
+docker pull kejizhihui/openbot:1.1          # 或重新 build
+docker run -d ...（同上命令）
+```
+
+### 访问
 
 ```
 Web 查看器: http://服务器IP:7777
@@ -268,9 +306,8 @@ Web 查看器: http://服务器IP:7777
 | `/app/download` | 下载文件 + 数据库（look.db / media_cache.db / download_tasks.db / promote.db） |
 | `/app/logs` | 运行日志 |
 | `/app/sessions` | MTProto 会话（备份可免重新登录） |
-| `/app/data` | 持久化数据 |
 
-> Web 页面已内置进镜像（features/promote/promote.html），无需挂载。
+> Web 页面已内置进镜像（features/promote/promote.html），无需挂载；数据统一在 download/，无独立 data 目录。
 
 ---
 
@@ -280,6 +317,7 @@ Web 查看器: http://服务器IP:7777
 - 建议使用**私有仓库**存放本项目
 - `sessions/`、`download/`、`logs/`、`*.db`（含 promote.db）为运行期数据，已在 `.gitignore` 中忽略
 - 中国大陆使用必须配置 `PROXY`（HTTP 代理，如 Clash 的 7897 端口）
+- **镜像不含任何密钥/会话/数据**（`.env`、数据库、登录态全部通过挂载提供），可放心公开分发
 
 ---
 
@@ -292,3 +330,6 @@ Web 查看器: http://服务器IP:7777
 | Web 打不开 | 确认 `python features/look/look_server.py` 已启动 |
 | 下载卡住不动 | `/dls` 查看任务状态，`/dl_continue 任务号` 从断点续传 |
 | 数据库 locked | 正常现象（WAL 模式多进程读写），稍后重试即可 |
+| 首次部署 .env 为空/报配置错误 | 正常：程序自动写入模板并提示，填好配置后 `docker restart` 即可 |
+| 推广转发/群文件扫描不可用 | 先给 Bot 发 `/mtlogin` 完成 MTProto 登录（这些功能依赖登录态） |
+| 下载卡住（网络断开） | 日志显示"网络断开，下载等待恢复"，网络恢复后自动续传 |
