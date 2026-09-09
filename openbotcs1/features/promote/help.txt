@@ -1,0 +1,2 @@
+📤 推广转发（Web 端操作）：
+/promote - 推广转发使用说明（Web 端 http://127.0.0.1:7777/promote.html）

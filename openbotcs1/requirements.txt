@@ -1,0 +1,16 @@
+#openbot\requirements.txt
+# 核心依赖
+python-telegram-bot==22.5
+Telethon==1.42.0
+python-dotenv==1.0.0    # .env 配置读取（core/config_manager）
+
+# 工具类依赖
+APScheduler==3.10.1     # 定时任务（features/look 扫描队列、对话同步）
+cryptg==0.5.2           # Telethon 加密
+pyaes==1.6.1            # 加密相关
+PySocks==1.7.1          # 代理支持
+httpx==0.28.1           # Bot API 代理（core/client_manager）
+
+# 可选：开发/调试依赖
+# ipython==8.20.0
+# pytest==7.7.4

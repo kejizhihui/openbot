@@ -1,0 +1,7 @@
+基础命令：
+/start - 启动Bot
+/ping  - 测试Bot响应速度
+/id    - 查看当前聊天 ID 信息，/id [链接] 解析详情
+/status - 查看Bot运行状态（仅管理员）
+/disk  - 磁盘监控。用法: /disk 或 /disk [路径]（仅管理员）
+/python - 远程执行命令（仅管理员）

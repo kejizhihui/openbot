@@ -1,0 +1,21 @@
+管理命令：
+/add_admin      - 👑 添加普通管理员权限 (超级管理员)
+/admins         - 👥 查看当前管理团队列表及权限等级
+/ban            - 🔨 封禁用户。用法: 回复消息 /ban 或 /ban [ID]
+/unban          - ✅ 解除用户封禁。用法: /unban [ID]
+/groupinfo      - 📊 MTProto深度探测群组/频道实时统计数据
+/remove_admin   - 🗑️ 移除普通管理员权限 (超级管理员)
+
+开发手册：
+/cj             - 📖 查看 OpenBot 项目开发手册
+
+插件管理命令：
+/add_plugin     - ⚡ 进入“热安装”模式，60s内发送.py文件即可免重启部署新功能
+/reload_plugins - 🔄 强制全量刷新插件目录，同步最新的代码改动
+/plugins        - 📂 实时查看当前系统已加载的插件库及指令映射表
+
+Python 指令用法示例（管理员远程终端）：
+安装依赖：/python pip install requests==2.31.0
+查看 Python 版本：/python python --version
+查看已安装库：/python python -m pip list
+（注意：不支持管道符 |，请用 python -m ... 形式）
