@@ -4,7 +4,7 @@
 
 - **MTProto**（核心监控层）：扫描群文件、下载、收藏夹监听、登录管理
 - **Bot API**（指令交互层）：命令控制、权限管理、插件热重载
-- **Web 查看器**（7777 端口）：群列表 / 文件查询 / 扫描进度 / 下载任务，独立进程运行
+- **Web 查看器**（7777 端口）：群列表 / 文件查询 / 扫描进度 / 下载任务 / 推广转发，独立进程运行
 
 ---
 
@@ -14,10 +14,10 @@
 |---|---|
 | 🧩 插件化架构 | 插件只依赖 core，互不 import，可独立安装/卸载/热重载 |
 | 📥 统一下载引擎 | 命令下载（`/dl`）、转发自动下载（`/at`）、收藏夹监听，全部支持**续扫续传** |
-| 🔍 群文件扫描 | 扫描全部历史媒体，分类统计（图片/视频/音乐/文档），增量扫描 |
+| 🔍 群文件扫描 | 扫描全部历史媒体，分类统计（图片/视频/音乐/其它/失效，与 Telegram 计数对账），增量扫描 |
 | 💾 共享扫描缓存 | `core/media_scanner.py` + `core/media_cache.py`，扫描一次、多处复用 |
 | 🖥️ Web 管理 | 浏览器操作下载任务、查询群文件、发起扫描，无需发消息 |
-| 📤 推广转发（v1.2） | 从来源群按文件 id 重发到目标群（绕开禁转），筛选/附带文字/每 N 条插入推广/自动监听，Web /promote.html 配置 |
+| 📤 推广转发（v1.3） | 从来源群按文件 id 重发到目标群（绕开禁转），相册聚合/全选全部/去除重复/#标签筛选/附带文字/每 N 条插入推广/自动监听，任务可撤回/重试/删除，Web /promote.html 配置 |
 | 🔄 热重载 | `/reload_plugins` 免重启同步代码；`/add_plugin` 免重启安装新插件 |
 | 🛡️ 权限管控 | 超级管理员（ADMIN_ID）+ 普通管理员列表（ADMIN_LIST） |
 | 📋 命令菜单自动同步 | 启动/热重载时自动同步命令菜单到 Telegram，与 help.txt 永远一致 |
@@ -51,14 +51,12 @@ openbotcs1/
 │   ├── downloader/             # 统一下载引擎（/dl*）+ 转发自动下载（/at）
 │   ├── help_auto/              # 帮助中心（/help）
 │   ├── look/                   # 群文件查看器（Web 7777 + 扫描 + 对话同步）
-│   ├── promote/                # 推广转发（v1.2：重发文件到目标群 + 推广插入 + 自动监听）
+│   ├── promote/                # 推广转发（v1.3：重发 + 聚合/去重/推广插入/自动监听 + promote.html 页面）
 │   └── mtproto/                # MTProto 登录管理器（/mtlogin）
-├── web/                        # Web 页面（promote.html 等，v1.2 起挂载 C:\openbot\web\，改页面不用重建镜像）
 ├── download/                   # 下载文件存储 + 数据库（运行期生成，勿提交）
 ├── sessions/                   # MTProto 物理会话（运行期生成，勿提交）
 ├── logs/                       # 运行日志（运行期生成，勿提交）
 ├── Dockerfile                  # 容器镜像
-├── docker-compose.yml          # 一键部署（bot + web 同容器）
 ├── requirements.txt            # Python 依赖
 ├── .env.example                # 配置模板（复制为 .env 后填写）
 └── .gitignore
@@ -161,7 +159,7 @@ python features/look/look_server.py
 | `/help` | 查看全部命令帮助 |
 | `/look` | 群文件查看器使用说明（Web 端 http://127.0.0.1:7777） |
 | `/mtlogin` | 机器人对话登录命令 |
-| `/promote` | 推广转发：前往 Web http://127.0.0.1:7777/promote.html 配置（v1.2） |
+| `/promote` | 推广转发：前往 Web http://127.0.0.1:7777/promote.html 配置（v1.3） |
 
 ---
 
@@ -186,13 +184,14 @@ Web 页面 → look_server（7777）→ look.db 请求队列
           downloader 下载引擎 → download_tasks.db + 下载文件
 ```
 
-### 推广转发（v1.2）：**http://127.0.0.1:7777/promote.html**
+### 推广转发（v1.3）：**http://127.0.0.1:7777/promote.html**
 
-- 配置来源群 → 目标群，筛选类型（图片/视频/音乐/其它文件），附带文字四模式
-- **推广插入**：每转发 N 条成功后插入 1 条推广（指定内容=群链接+消息ID，或自定义文案）
+- 来源群 → 目标群，内容筛选（图片/视频/音乐/其它/#标签），附带文字（保留原文/自定义）
+- **相册聚合**：同媒体组聚合为相册发送，不拆散；**全选全部**（跨页保留）+ **去除重复**（按文件 ID 去重，聚合不拆）
+- **推广插入**：每转发 N 次插入 1 条推广（指定内容=群链接+消息ID，或自定义文案）
 - **自动监听**：来源群新消息自动转发（绕开禁转，按文件 id 重发）
-- 来源内容预览分页加载（复用群文件扫描缓存），勾选/单条立即转发
-- 独立库 `download/promote.db`，任务进度实时刷新、可停止
+- **任务管理**：详情/停止/撤回/重试/删除，进度双口径（文件数 + 转发次数）
+- 独立库 `download/promote.db`，发送记录落库支持一键撤回
 
 ---
 
@@ -239,11 +238,20 @@ def register(manager):
 
 ### 1. 配置 .env（同上）
 
-### 2. 构建并启动
+### 2. 构建镜像并启动
 
 ```bash
-# 同时运行 bot + web（一个容器双进程）
-docker compose up -d --build
+# 构建镜像（项目根目录）
+docker build -t openbot-deploy:latest .
+
+# 运行容器（Windows/PowerShell 写法，Linux 改路径）
+docker run -d --name openbot-deploy --restart unless-stopped \
+  --add-host=host.docker.internal:host-gateway -p 7777:7777 \
+  --log-opt max-size=20m --log-opt max-file=3 \
+  -v "C:\openbot\.env:/app/.env" \
+  -v "C:\openbot\download:/app/download" -v "C:\openbot\logs:/app/logs" \
+  -v "C:\openbot\sessions:/app/sessions" -v "C:\openbot\data:/app/data" \
+  openbot-deploy:latest
 ```
 
 ### 3. 访问
@@ -254,13 +262,15 @@ Web 查看器: http://服务器IP:7777
 
 ### 数据持久化
 
-| 目录 | 内容 |
+| 挂载点 | 内容 |
 |---|---|
-| `./data` | Web 数据库（look.db） |
-| `./download` | 下载文件 + 任务数据库 + 扫描缓存 |
-| `./sessions` | MTProto 会话 |
-| `./logs` | 日志 |
-| `./web` | Web 页面（v1.2 起挂载 /app/web，promote.html 等） |
+| `/app/.env` | 配置（改配置后重启容器生效） |
+| `/app/download` | 下载文件 + 数据库（look.db / media_cache.db / download_tasks.db / promote.db） |
+| `/app/logs` | 运行日志 |
+| `/app/sessions` | MTProto 会话（备份可免重新登录） |
+| `/app/data` | 持久化数据 |
+
+> Web 页面已内置进镜像（features/promote/promote.html），无需挂载。
 
 ---
 
@@ -268,7 +278,7 @@ Web 查看器: http://服务器IP:7777
 
 - **.env 绝不要提交到仓库**（含 BOT_TOKEN / API_HASH，泄露=账号被盗）
 - 建议使用**私有仓库**存放本项目
-- `sessions/`、`download/`、`logs/` 为运行期数据，已在 `.gitignore` 中忽略
+- `sessions/`、`download/`、`logs/`、`*.db`（含 promote.db）为运行期数据，已在 `.gitignore` 中忽略
 - 中国大陆使用必须配置 `PROXY`（HTTP 代理，如 Clash 的 7897 端口）
 
 ---
